@@ -1,0 +1,7 @@
+.vs
+.code
+Debug
+Release
+*.log
+*.obj
+*.pdb
