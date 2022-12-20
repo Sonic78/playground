@@ -7,18 +7,16 @@
 #include <time.h>
 #include <stdlib.h>
 
+#include "2dlib.h"
+#include "scaralib.h"
+
 #define X 1
 #define Y 2
 #define XY 3
 #define ROT 3
-#define DIM 3						// Dimension//
-#define PI 3.14159265
-#define ABS(x) ((x)<0?-(x):(x))		// Betragmakro
 #define NPT 6						//Anzahl der Punkte
 
 
-#define NOBJ 5
-#define NKISTE 1
 #define NROLLEN 4
 #define DR 70
 
@@ -27,10 +25,29 @@
 #define WARTEN 1
 #define LAUFEN 2
 #define BEWEGEN 3
-#define KISTE 4
 
-#include "2dlib.c"
 
+/* G L O B A L E   V A R I A B L E N */
+int cx, cy; // Bildschirmgröße
+HDC hdcMem;		//Speicher DC
+HBITMAP hBitmap;// Bitmap
+
+//Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
+// Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
+POINT2D aArm1[NPT] = { {-15,15},{210,15},{210,-15},{-15,-15},{0,0},{200,0} };
+POINT2D aArm2[NPT] = { {-15,15},{210,10},{210,-10},{-15,-15},{0,0},{200,0} };
+
+POINT2D aA1T[NPT], aA2T[NPT], aA2T1[NPT]; 	//Transformierte Punkte
+POINT aiA1T[NPT], aiA2T[NPT];		//Transformierte Punkte int für Polygon
+POINT2D pos, posAlt;			//Soll Position x,y
+POINT   spur[1000];			//Spur der Bewegung
+double scale;							//Scalierungsfaktor
+MATRIX2D mRotA1, mRotA2, mTransA2; // Rot- und Trans Matrizen
+int cspur;								//Spurpunkte zählen
+double R1, R2;					//Radien der Arme
+int Rmax, Rmin;							//Arbeitsraum
+double alpha, beta;				//Rotationswinkel A1 und A2
+POINT2D pDemo[360];
 
 typedef struct tagObject
 {
@@ -39,37 +56,14 @@ typedef struct tagObject
 	int status;
 } OBJEKT;
 
-
-/* G L O B A L E   V A R I A B L E N */
-int cx,cy; // Bildschirmgröße
-HDC hdcMem;		//Speicher DC
-HBITMAP hBitmap;// Bitmap
-
-//Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
-// Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
-POINT2D aArm1[NPT] = {{-15,15},{210,15},{210,-15},{-15,-15},{0,0},{200,0}};
-POINT2D aArm2[NPT] = {{-15,15},{210,10},{210,-10},{-15,-15},{0,0},{200,0}};
-
-POINT2D aA1T[NPT],aA2T[NPT],aA2T1[NPT]; 	//Transformierte Punkte
-POINT aiA1T[NPT], aiA2T[NPT];		//Transformierte Punkte int für Polygon
-POINT2D pos, posAlt;			//Soll Position x,y
-POINT   spur[1000];			//Spur der Bewegung
-double scale;							//Scalierungsfaktor
-MATRIX2D mRotA1,mRotA2,mTransA2; // Rot- und Trans Matrizen
-int cspur;								//Spurpunkte zählen
-double R1, R2;					//Radien der Arme
-int Rmax, Rmin;							//Arbeitsraum
-double alpha, beta;				//Rotationswinkel A1 und A2
-POINT2D pDemo[360];
+#define NOBJ 5
 OBJEKT Obj[NOBJ];
 
-POINT PKiste[NKISTE] = {-200,250};
-POINT PPick = {-300,-100};
+#define KISTE 4
+#define NKISTE 1
+POINT PKiste[NKISTE] = { -200,250 };
+POINT PPick = { -300,-100 };
 
-/*Prototyp*/
-int DrawItems(HDC hdc, POINT2D PObj, int Flag);  //Objekte, Kisten und Laufband zeichnen
-
-#include "scaralib.c"
 
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
