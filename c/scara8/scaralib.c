@@ -1,6 +1,3 @@
-//#include "unistd.h"
-//#include "windows.h"
-
 #define ABS(x) ((x)<0?-(x):(x))		// Betragmakro
 #define PI 3.14159265
 #define UZ 0
