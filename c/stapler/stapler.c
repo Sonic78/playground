@@ -7,16 +7,18 @@
 #include <time.h>
 #include <stdlib.h>
 
-#include "2dlib.h"
-#include "scaralib.h"
-
 #define X 1
 #define Y 2
 #define XY 3
 #define ROT 3
+#define DIM 3						// Dimension//
+#define PI 3.14159265
+#define ABS(x) ((x)<0?-(x):(x))		// Betragmakro
 #define NPT 6						//Anzahl der Punkte
 
 
+#define NOBJ 5
+#define NKISTE 1
 #define NROLLEN 4
 #define DR 70
 
@@ -25,29 +27,11 @@
 #define WARTEN 1
 #define LAUFEN 2
 #define BEWEGEN 3
+#define KISTE 4
+#define FLIESSBAND 5
 
+#include "2dlib.c"
 
-/* G L O B A L E   V A R I A B L E N */
-int cx, cy; // Bildschirmgröße
-HDC hdcMem;		//Speicher DC
-HBITMAP hBitmap;// Bitmap
-
-//Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
-// Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
-POINT2D aArm1[NPT] = { {-15,15},{210,15},{210,-15},{-15,-15},{0,0},{200,0} };
-POINT2D aArm2[NPT] = { {-15,15},{210,10},{210,-10},{-15,-15},{0,0},{200,0} };
-
-POINT2D aA1T[NPT], aA2T[NPT], aA2T1[NPT]; 	//Transformierte Punkte
-POINT aiA1T[NPT], aiA2T[NPT];		//Transformierte Punkte int für Polygon
-POINT2D pos, posAlt;			//Soll Position x,y
-POINT   spur[1000];			//Spur der Bewegung
-double scale;							//Scalierungsfaktor
-MATRIX2D mRotA1, mRotA2, mTransA2; // Rot- und Trans Matrizen
-int cspur;								//Spurpunkte zählen
-double R1, R2;					//Radien der Arme
-int Rmax, Rmin;							//Arbeitsraum
-double alpha, beta;				//Rotationswinkel A1 und A2
-POINT2D pDemo[360];
 
 typedef struct tagObject
 {
@@ -56,22 +40,67 @@ typedef struct tagObject
 	int status;
 } OBJEKT;
 
-#define NOBJ 5
+
+/* G L O B A L E   V A R I A B L E N */
+int cx,cy; // Bildschirmgröße
+HDC hdcMem;		//Speicher DC
+HBITMAP hBitmap;// Bitmap
+
+
+
+//Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
+// Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
+POINT2D aArm1[NPT] = {{-15,15},{210,15},{210,-15},{-15,-15},{0,0},{200,0}};
+POINT2D aArm2[NPT] = {{-15,15},{210,10},{210,-10},{-15,-15},{0,0},{200,0}};
+
+
+
+POINT2D aA1T[NPT],aA2T[NPT],aA2T1[NPT]; 	//Transformierte Punkte
+POINT aiA1T[NPT], aiA2T[NPT];		//Transformierte Punkte int für Polygon
+POINT2D pos, posAlt;			//Soll Position x,y
+POINT   spur[1000];			//Spur der Bewegung
+double scale;							//Scalierungsfaktor
+MATRIX2D mRotA1,mRotA2,mTransA2; // Rot- und Trans Matrizen
+int cspur;								//Spurpunkte zählen
+double R1, R2;					//Radien der Arme
+int Rmax, Rmin;							//Arbeitsraum
+double alpha, beta;				//Rotationswinkel A1 und A2
+POINT2D pDemo[360];
 OBJEKT Obj[NOBJ];
 
-#define KISTE 4
-#define NKISTE 1
-POINT PKiste[NKISTE] = { -200,250 };
-POINT PPick = { -300,-100 };
 
+
+POINT PKiste[NKISTE] = {-200,250};
+POINT PPick = {-300,100};
+
+POINT P0 ={-300,125};
+POINT P1 ={0,125};
+POINT P2 ={0,300};
+POINT P3 ={-200,300};
+POINT P4 ={0,250};
+POINT P5 ={0,100};
+POINT P6 ={-300,50};
+
+POINT Pm1 = {0,212.5};
+POINT Pm2 = {0,175};
+
+/*Prototyp*/
+int DrawItems(HDC hdc, POINT2D PObj, int Flag);  //Objekte, Kisten und Laufband zeichnen
+
+#include "scaralib.c"
 
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
-double r = 20;					//Größe Objekt und Kisten
+double r = 50;					//Größe Objekt und Kisten
 HBRUSH hBrush[NKISTE];			//Pinsel
 HPEN hPen[NKISTE], hPenBand;	//Stifte
 POINT P;
-int i ;
+int i;
+
+
+
+POINT pPts[4] = {-35,40,35,40,50,-60,-50,-60};
+
 
 if (!Flag) return 0;			//Wenn nicht Sequenz => zurück
 
@@ -82,36 +111,58 @@ hBrush[1] = CreateSolidBrush(RGB(150,150,150));
 hPen[1] = CreatePen(PS_SOLID,2,RGB(0,0,0));
 
 
+
+//Hier wird der "Ramen" Obere Fliessband erzeugt
+
 SelectObject(hdc,hPen[1]);
 RoundRect(hdc,-600,200,-400+NROLLEN*DR,200-DR,DR,DR);
-//Polyline(hdc,
+
+
+//Hier werden die Rollen des oberen Fliessbands erzeugt
 
 SelectObject(hdc,hPen[1]);
 SelectObject(hdc,hBrush[1]);
-
 for (i = 0; i < NROLLEN; i++){
 Ellipse(hdc,-400+DR*i,200,(-400+DR)+DR*i,200-DR);
 }
+
+
+//Hier wird der Ständerblock für den Robotter erzeugt
+
+SelectObject(hdc,hBrush[1]);
+SelectObject(hdc,hPen[1]);
+Polygon(hdc, pPts, 4);
+
+
+
 
 for(i = 0; i < NOBJ; i++)	//über alle Objekte
 	{
 		switch(Obj[i].status)	//Position der Objekte anhand des Status ermitteln
 		{
 			case WARTEN: 	P = Obj[i].P; break;
-			case LAUFEN:	Obj[i].P.y += 2; P = Obj[i].P; break;  //Weiter auf Laufband bewegen
+			case LAUFEN:	Obj[i].P.y += 1; P = Obj[i].P; break;  //Weiter auf Laufband bewegen
 			case BEWEGEN: 	P = Pint(PObj);  break;				   // am Greifer
-			case KISTE: 	P = PKiste[Obj[i].typ];					//in Kiste
+			case KISTE: 	P = PKiste[Obj[i].typ]; 					//in Kiste
+			case FLIESSBAND:	Obj[i].P.x -= 5; P =Obj[i].P; break;
 		}
-		SelectObject(hdc, hPen[Obj[i].typ]);						//Stift aktivieren
-		SelectObject(hdc, hBrush[Obj[i].typ]);						//Pinsel aktivieren
-		Ellipse(hdc,(int)P.x-r,(int)P.y-r,(int)P.x+r,(int)P.y+r);	//Objekt zeichnen
+
+		SelectObject(hdc, hPen[0]);						//Stift aktivieren
+		SelectObject(hdc, hBrush[0]);						//Pinsel aktivieren
+		Rectangle(hdc,(int)P.x-r,(int)P.y-r,(int)P.x+r,(int)P.y+r);	//Objekt zeichnen
+
 }//for
+
+
 for(i = 0; i< NKISTE; i++){		//Stifte und Pinsel löschen
+
 	DeleteObject(hPen[i]);
 	DeleteObject(hBrush[i]);
 }
 //DeleteObject(hPenBand);
 return 0;
+
+
 }
 
 
@@ -121,16 +172,18 @@ POINT2D ProcSeq(HWND hwnd)
 	HBRUSH hSpPen;
 	int i;
 
+
+
 	for (i = 0; i < NOBJ; i++){		//Objekte erzeugen
 		Obj[i].P.x = -300;
-		Obj[i].P.y = -500;
+		Obj[i].P.y = -300;
 		Obj[i].status = WARTEN;			//Status warten
 }
 	hdc = GetDC(hwnd);
 	hSpPen = CreatePen(PS_DOT,1,RGB(200,0,0));
 
 	Obj[0].status = LAUFEN;				//Erstes Obj losschicken
-	pos = MoveScaraSpiral(hdc, Pdouble(PKiste[0]), pos, 1000,UZ, NULL, TRUE);
+	//pos = MoveScaraSpiral(hdc, Pdouble(PKiste[0]), pos, 1000,UZ, NULL, TRUE);        //Alle Spiralbewegungen von dem Scara robotter unterbunden
 	/*Obj[1].status = LAUFEN;				//Zweites Obj losschicken
 	pos = MoveScaraSpiral(hdc, Pdouble(PKiste[1]), pos, 1000,UZ, NULL, TRUE);
 	pos = MoveScaraSpiral(hdc, Pdouble(PKiste[2]), pos, 1000,UZ, NULL, TRUE);
@@ -141,17 +194,41 @@ POINT2D ProcSeq(HWND hwnd)
 	pos = MoveScaraSpiral(hdc, Pdouble(PKiste[6]), pos, 1000,UZ, NULL, TRUE);
 	pos = MoveScaraSpiral(hdc, Pdouble(PKiste[7]), pos, 1000,UZ, NULL, TRUE);*/
 
+
 	for(i = 0; i < NOBJ; i++){			//über alle Objekte
 		if (NOBJ > i+1) Obj[i+1].status = LAUFEN;	//nächstes Objekt losschicken
 		PPick.y = Obj[i].P.y;			//PickPosition in Y fixieren
 		pos = MoveScaraLin(hdc, Pdouble(PPick), pos, 1000,hSpPen, TRUE);	//PickPos anfahren
 		pos = MoveScaraLin(hdc, Pdouble(Obj[i].P), pos, 1000,hSpPen, TRUE);	//greifen
-		PlaySound("click.wav", NULL, SND_ASYNC);
+
+		//PlaySound("click.wav", NULL, SND_ASYNC);
 		posAlt = pos;
 		Obj[i].status = BEWEGEN;				//Status
-		pos = MoveScaraLin(hdc, Pdouble(PKiste[Obj[i].typ]), pos, 1000, hSpPen, TRUE); //zur Kiste
-		PlaySound("click.wav", NULL, SND_ASYNC);
+
+		pos = MoveScaraLin(hdc, Pdouble(P0), pos, 300, hSpPen, TRUE);
+		pos = MoveScaraLin(hdc, Pdouble(P1), pos, 300, hSpPen, TRUE);
+		pos = MoveScaraArc(hdc, Pdouble(Pm1), 87.5, -90, 90, 300, hSpPen, TRUE);
+		pos = MoveScaraLin(hdc, Pdouble(P3), pos, 300, hSpPen, TRUE);
+
+		pos = MoveScaraLin(hdc, Pdouble(PKiste[Obj[i].typ]), pos, 1000, hSpPen, TRUE);
+
 		Obj[i].status = KISTE;					//Status
+		Obj[i].P.x = -200;
+		Obj[i].P.y = 250;
+		Obj[i].status = FLIESSBAND;
+
+		pos = MoveScaraLin(hdc, Pdouble(P4), pos, 300, hSpPen, TRUE);
+		pos = MoveScaraArc(hdc, Pdouble(Pm2), 75, 90, -90, 300, hSpPen, TRUE);
+		pos = MoveScaraLin(hdc, Pdouble(P6), pos, 300, hSpPen, TRUE);
+
+
+		/*
+		//PlaySound("click.wav", NULL, SND_ASYNC);
+		Obj[i].status = KISTE;					//Status
+		Obj[i].P.x = -200;
+		Obj[i].P.y = 250;
+		Obj[i].status = FLIESSBAND;*/
+
 
 	}
 	posAlt = pos;
