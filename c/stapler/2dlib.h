@@ -4,25 +4,30 @@
 //#define PI 3.14159265
 static const double PI = 3.14159265;
 
-// Anzahl der Punkte
-#define NPT	6							
+/* Anzahl der Punkte */
+enum RobotArmPoints {
+    NPT = 6, /* #define NPT	6 */
+};
+
 
 // Dimension of 3x3 matrix
-#define DIM 3
+enum MATRIX2D_Dimension {
+    DIM = 3,  /* Type safe alternative to #define DIM 3 */
+};
 
 // Matrix 3x3
 typedef struct tagMATRIX2D {
-	double v[DIM][DIM];
+    double v[DIM][DIM];
 }MATRIX2D;
 
 // Punkt im 2D als double
 typedef struct tagPOINT2D {
-	double x, y;
+    double x, y;
 }POINT2D;
 
 // Vektor 2D in homogenen Koordinaten = 3 Zeilen, 1 Spalte
 typedef struct tagPOINT2DHOM {
-	double v[DIM];
+    double v[DIM];
 }POINT2DHOM;
 
 // Initialisiert Skalierungsmatrix
