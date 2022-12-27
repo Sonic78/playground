@@ -64,7 +64,6 @@ OBJEKT Obj[NOBJ];
 POINT PKiste[NKISTE] = { -200,250 };
 POINT PPick = { -300,-100 };
 
-
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
 double r = 20;					//Größe Objekt und Kisten
