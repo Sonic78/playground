@@ -6,6 +6,8 @@
 #define UZ 0
 #define GUZ 1
 
+void Initialize(double rmax, double rmin, double scale, int cspur);
+
 // Bewegt den Scara auf einer Spiralförmeigen Bahn von PAkt zu PZiel mit der Geschwingkeit velo
 // uz gibt an ob im oder gegen den Uhrzeugersinn (Konstanten UZ und GUZ)
 // Zeichnet Spur falls hSpurPen ungleich NULL

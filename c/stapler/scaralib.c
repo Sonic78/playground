@@ -11,17 +11,19 @@ extern HDC hdcMem;
 
 extern POINT2D aArm1[NPT];
 extern POINT2D aArm2[NPT];
-extern double R1, R2;					//Radien der Arme
-extern double alpha, beta;				//Rotationswinkel A1 und A2
-extern MATRIX2D mRotA1, mRotA2, mTransA2; // Rot- und Trans Matrizen
+extern double R1, R2;  // Radien der Arme
 
-extern POINT2D aA1T[NPT], aA2T[NPT], aA2T1[NPT]; 	//Transformierte Punkte
-extern POINT aiA1T[NPT], aiA2T[NPT];		//Transformierte Punkte int für Polygon
+extern POINT   spur[1000];  //Spur der Bewegung
+static double mScale;  //Scalierungsfaktor
+static int mCSpur;  //Spurpunkte zählen
+static int mRmax, mRmin;  //Arbeitsraum
 
-extern POINT   spur[1000];			//Spur der Bewegung
-extern double scale;							//Scalierungsfaktor
-extern int cspur;								//Spurpunkte zählen
-extern int Rmax, Rmin;							//Arbeitsraum
+void Initialize(double rmax, double rmin, double scale, int cspur) {
+    mRmax = (int) rmax;
+    mRmin = (int) rmin;
+    mScale = scale;
+    mCSpur = cspur;
+}
 
 int DrawItems(HDC hdc, POINT2D PObj, int Flag); //Objekte, Kisten und Laufband zeichnen
 
@@ -107,10 +109,14 @@ POINT2D PosScara(HDC hdc, POINT2D Psoll, HPEN hSpurPen, int OFlag)
 // OFlag steuert, ob eine Umgebung mit der Funktion DrawItems gezeichnet werden soll
 // Rückgabewert ist neue Position
 {
-    int Lsg;								//Anzahl der Lösungen
-    int i;
-    HBRUSH hBrush1, hBrush3;			//Pinsel
-    HPEN hPen = 0, hOldPen = 0;		//Stifte
+    POINT2D aA1T[NPT], aA2T[NPT], aA2T1[NPT];  //Transformierte Punkte
+    POINT aiA1T[NPT], aiA2T[NPT];  // Transformierte Punkte int für Polygon
+    MATRIX2D rotA1, rotA2, transA2; // Rot- und Trans Matrizen
+    double alpha = 0, beta = 0;  // Rotationswinkel A1 und A2
+    int Lsg = 0;  //Anzahl der Lösungen
+    int i = 0;
+    HBRUSH hBrush1, hBrush3;  // Pinsel
+    HPEN hPen = 0, hOldPen = 0;  // Stifte
 
     hBrush1 = CreateSolidBrush(RGB(255, 255, 255));	//Hintergrund Löschen
     hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
@@ -122,25 +128,26 @@ POINT2D PosScara(HDC hdc, POINT2D Psoll, HPEN hSpurPen, int OFlag)
     if (Lsg == 0) {
         MessageBeep(MB_ICONEXCLAMATION);	//Pos nicht möglich
     }
-    mRotA1 = InitRotMat(alpha);	//Rotationsmatrizen init
-    mRotA2 = InitRotMat(beta);
+    rotA1 = InitRotMat(alpha);	//Rotationsmatrizen init
+    rotA2 = InitRotMat(beta);
 
     for (i = 0; i < NPT; i++) {		// Punkte der Arme drehen
-        aA1T[i] = MxV(mRotA1, aArm1[i]);
-        aA2T1[i] = MxV(mRotA2, aArm2[i]);
+        aA1T[i] = MxV(rotA1, aArm1[i]);
+        aA2T1[i] = MxV(rotA2, aArm2[i]);
     }
 
-    mTransA2 = InitTransMat(aA1T[5].x, aA1T[5].y); // Translationsmatrix int
+    transA2 = InitTransMat(aA1T[5].x, aA1T[5].y); // Translationsmatrix int
 
-    for (i = 0; i < NPT; i++)
-        aA2T[i] = MxV(mTransA2, aA2T1[i]); //Arm 2 verschieben
+    for (i = 0; i < NPT; i++) {
+        aA2T[i] = MxV(transA2, aA2T1[i]); //Arm 2 verschieben
+    }
 
     Psoll = aA2T[5];  //Neue Position
 
     if (hSpurPen != NULL) {
-        spur[cspur] = Pint(Psoll);			// Spur zeichnen
-        if (cspur < 999) cspur++;			// Spurbereich? Anzahl Spurpunkte
-        else cspur = 0;						// rücksetzten
+        spur[mCSpur] = Pint(Psoll);			// Spur zeichnen
+        if (mCSpur < 999) mCSpur++;			// Spurbereich? Anzahl Spurpunkte
+        else mCSpur = 0;						// rücksetzten
     }
     for (i = 0; i < NPT; i++) {				//Transformierte Punkte nach int casten
         aiA1T[i] = Pint(aA1T[i]);
@@ -150,20 +157,20 @@ POINT2D PosScara(HDC hdc, POINT2D Psoll, HPEN hSpurPen, int OFlag)
     SetMapMode(hdcMem, MM_ISOTROPIC);					//Y nach oben
     SetViewportOrgEx(hdcMem, cx / 2, cy / 2, NULL); 		// (0,0) in der Mitte
     SetWindowExtEx(hdcMem, cx, cy, NULL);
-    SetViewportExtEx(hdcMem, cx * scale, -cy * scale, NULL);
+    SetViewportExtEx(hdcMem, cx * mScale, -cy * mScale, NULL);
     PatBlt(hdcMem, -cx / 2, -cy / 2, cx, cy, WHITENESS);
 
     SetMapMode(hdc, MM_ISOTROPIC);					//Y nach oben
     SetViewportOrgEx(hdc, cx / 2, cy / 2, NULL); 		// (0,0) in der Mitte
     SetWindowExtEx(hdc, cx, cy, NULL);
-    SetViewportExtEx(hdc, cx * scale, -cy * scale, NULL);
+    SetViewportExtEx(hdc, cx * mScale, -cy * mScale, NULL);
 
     hPen = CreatePen(PS_DASHDOT, 1, RGB(0, 255, 0));	//grün, Strichpunkt
     SelectObject(hdcMem, hPen);
     hBrush1 = GetStockObject(NULL_BRUSH);
     SelectObject(hdcMem, hBrush1);
 
-    Ellipse(hdcMem, -Rmin, -Rmin, Rmin, Rmin);
+    Ellipse(hdcMem, -mRmin, -mRmin, mRmin, mRmin);
 
     if (OFlag) {
         DrawItems(hdcMem, Psoll, OFlag);			// Umgebung zeichnen
