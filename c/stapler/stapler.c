@@ -71,30 +71,7 @@ POINT PKiste = { -200,250 };
 POINT PPick = { -300,100 };
 
 
-// Translation of a Polygon with 8 points
-static void MovePalette(POINT pPointsIn[PalettePolygonPoints], POINT pPointsOut[PalettePolygonPoints], double tx, double ty) {
-    int i = 0;
-    // Copy input polygon points (type POINT) to local matrix that uses POINT2D
-    POINT2D polygonPoints[PalettePolygonPoints] = {0};
-    for (i = 0; i < PalettePolygonPoints; ++i) {
-        polygonPoints[i].x = pPointsIn[i].x;
-        polygonPoints[i].y = pPointsIn[i].y;
-    }
-
-    // Translationsmatrix
-    MATRIX2D translationMx = InitTransMat(tx, ty);
-    for (i = 0; i < 4; i++) {
-        polygonPoints[i] = MxV(translationMx, polygonPoints[i]);
-    }
-
-    // copy transated/moved points to pPointsOut
-    for (i = 0; i < 4; ++i) {
-        pPointsOut[i].x = (int) polygonPoints[i].x;
-        pPointsOut[i].y = (int) polygonPoints[i].y;
-    }
-}
-
-PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r) {
+static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r) {
     PalletPolygonPoints points = { centerX - r,centerY - r,
                                    centerX - r + 15,centerY - r,
                                    centerX - r + 15,centerY - r + 50,
@@ -110,7 +87,7 @@ PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r
 
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
-    const double r = 50;  //Größe Objekt und Kisten
+    const LONG r = 50;  //Größe Objekt und Kisten
     enum PenAndBrushItems {
         BrushAndPenSize = 2,
     };
@@ -203,7 +180,7 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
     //const POINT P5 = { 0,100 };
     const POINT P6 = { -300, 50 };
 
-    const POINT Pm1 = { 0, 212.5 };
+    const POINT Pm1 = { 0, 212 };
     const POINT Pm2 = { 0, 175 };
 
     /* Objekte initialisieren */
