@@ -72,16 +72,24 @@ POINT PPick = { -300,100 };
 
 
 static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r) {
-    PalletPolygonPoints points = { centerX - r,centerY - r,
-                                   centerX - r + 15,centerY - r,
-                                   centerX - r + 15,centerY - r + 50,
-                                   centerX + r - 15,centerY - r + 50,
-                                   centerX + r - 15,centerY - r,
-                                   centerX + r,centerY - r,
-                                   centerX + r, centerY + r,
-                                   centerX - r, centerY + r};
-
-    return points;
+    PalletPolygonPoints pp = {0};
+    pp.points[0].x = centerX - r;
+    pp.points[0].y = centerY - r;
+    pp.points[1].x = centerX - r + 15;
+    pp.points[1].y = centerY - r;
+    pp.points[2].x = centerX - r + 15;
+    pp.points[2].y = centerY - r + 50;
+    pp.points[3].x = centerX + r - 15;
+    pp.points[3].y = centerY - r + 50;
+    pp.points[4].x = centerX + r - 15;
+    pp.points[4].y = centerY - r;
+    pp.points[5].x = centerX + r;
+    pp.points[5].y = centerY - r;
+    pp.points[6].x = centerX + r;
+    pp.points[6].y = centerY + r;
+    pp.points[7].x = centerX - r;
+    pp.points[7].y = centerY + r;
+    return pp;
 }
 
 
@@ -196,7 +204,7 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
 
     // ueber alle Objekte iterieren bis fertig oder Terminierung angefragt
     for (i = 0; i < NOBJ && (mThreadState != ProcSeqThreadTerminationRequested); i++) {
-        if (NOBJ > i + 1) { 
+        if (NOBJ > i + 1) {
             Obj[i + 1].status = LAUFEN;
         }
         //nächstes Objekt losschicken
