@@ -7,3 +7,8 @@ Release
 *.pdb
 *.zip
 c/stapler/2dlib.h~RF31cab9ae.TMP
+*.dep
+*.err
+*.exe
+*.~c
+c/stapler/lcc/Makefile
