@@ -45,13 +45,15 @@ HDC hdcMem;  // Speicher DC
 static HBITMAP hBitmap;  // Bitmap
 /* Thread variables */
 static HANDLE ThreadHandle = NULL;
-static int VelocityScara = 300;
+static int VelocityScara = 400;
 static ProcSeqThreadState mThreadState;
 
 //Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
 // Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
-POINT2D aArm1[NPT] = { {-15,15},{210,15},{210,-15},{-15,-15},{0,0},{200,0} };
-POINT2D aArm2[NPT] = { {-15,15},{210,10},{210,-10},{-15,-15},{0,0},{200,0} };
+
+POINT2D aArm1[NPT] = { {-15,15},{350,15},{350,-15},{-15,-15},{0,0},{340,0} };
+POINT2D aArm2[NPT] = { {-15,15},{350,10},{350,-10},{-15,-15},{0,0},{340,0} };
+
 
 static POINT2D pos;  // Soll Position x,y
 POINT spur[1000];			//Spur der Bewegung
@@ -60,42 +62,44 @@ double R1, R2;					//Radien der Arme
 /* Anonymes enum für Array size */
 enum {
      /* Anzahl der Objekte. */
-     NOBJ = 5, /* #define NOBJ 5 */
+     NOBJ = 20, /* #define NOBJ 5 */
 };
 
 const int NROLLEN = 4;
 const int DR = 70;
 
 static OBJEKT Obj[NOBJ];
-POINT PKiste = { -200,250 };
-POINT PPick = { -300,100 };
+POINT PKiste = { -275,525 };
+POINT PPick = { -300,200 };
 
 
 static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r) {
-    PalletPolygonPoints pp = {0};
+
+	PalletPolygonPoints pp = {0};
     pp.points[0].x = centerX - r;
     pp.points[0].y = centerY - r;
-    pp.points[1].x = centerX - r + 15;
+    pp.points[1].x = centerX - r + 25;
     pp.points[1].y = centerY - r;
-    pp.points[2].x = centerX - r + 15;
+    pp.points[2].x = centerX - r + 25;
     pp.points[2].y = centerY - r + 50;
-    pp.points[3].x = centerX + r - 15;
+    pp.points[3].x = centerX + r - 25;
     pp.points[3].y = centerY - r + 50;
-    pp.points[4].x = centerX + r - 15;
+    pp.points[4].x = centerX + r - 25;
     pp.points[4].y = centerY - r;
     pp.points[5].x = centerX + r;
     pp.points[5].y = centerY - r;
     pp.points[6].x = centerX + r;
-    pp.points[6].y = centerY + r;
+    pp.points[6].y = centerY + r - 175;
     pp.points[7].x = centerX - r;
-    pp.points[7].y = centerY + r;
+    pp.points[7].y = centerY + r - 175;
     return pp;
 }
 
 
+
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
-    const LONG r = 50;  //Größe Objekt und Kisten
+    const long r = 125;  //Größe Objekt und Kisten
     enum PenAndBrushItems {
         BrushAndPenSize = 2,
     };
@@ -117,13 +121,13 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
 
     // Hier wird der "Rahmen" Obere Fliessband erzeugt
     SelectObject(hdc, hPen[1]);
-    RoundRect(hdc, -600, 200, -400 + NROLLEN * DR, 200 - DR, DR, DR);
+    RoundRect(hdc, -600, 400, -417 + NROLLEN * DR, 400 - DR, DR, DR);
 
     //Hier werden die Rollen des oberen Fliessbands erzeugt
     SelectObject(hdc, hPen[1]);
     SelectObject(hdc, hBrush[1]);
     for (i = 0; i < NROLLEN; i++) {
-        Ellipse(hdc, -400 + DR * i, 200, (-400 + DR) + DR * i, 200 - DR);
+        Ellipse(hdc, -417 + DR * i, 400, (-417 + DR) + DR * i, 400 - DR);
     }
 
     //Hier wird der Ständerblock für den Robotter erzeugt
@@ -135,25 +139,28 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
     {
         switch (Obj[i].status)  // Position der Objekte anhand des Status ermitteln
         {
-        case WARTEN:
-            P = Obj[i].P;
-            break;
-        case LAUFEN:   // Weiter auf Laufband bewegen
-            Obj[i].P.y += 1;
-            P = Obj[i].P;
-            break;
-        case BEWEGEN:  // am Greifer
-            P = Pint(PObj);
-            break;
-        case KISTE: //in Kiste
-            P = PKiste;
-        case FLIESSBAND:
-            Obj[i].P.x -= 5;
-            P = Obj[i].P;
-            break;
-        default:
-            continue;  /* P not initialized. weiter mit next iteration. */
-            break;
+            case WARTEN:
+                P = Obj[i].P;
+                break;
+            case LAUFEN:   // Weiter auf Laufband bewegen
+                Obj[i].P.y += 1;
+                P = Obj[i].P;
+                if ((Obj[i].P.y >= 50) && (i + 1 < NOBJ)) {
+                    Obj[i + 1].status = LAUFEN;
+                }
+                break;
+            case BEWEGEN:  // am Greifer
+                P = Pint(PObj);
+                break;
+            case KISTE: //in Kiste
+                P = PKiste;
+            case FLIESSBAND:
+                Obj[i].P.x -= 5;
+                P = Obj[i].P;
+                break;
+            default:
+                continue;  /* P not initialized. weiter mit next iteration. */
+                break;
         }
 
         SelectObject(hdc, hPen[1]);  // Schwarzen Stift aktivieren
@@ -161,7 +168,7 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
         PalletPolygonPoints polygon = CreatePalletPolygonPoints(P.x, P.y, r);
         //Rectangle(hdc, (int)(P.x - r), (int)(P.y - r), (int)(P.x + r), (int)(P.y + r));	//Objekt zeichnen
         Polygon(hdc, polygon.points, PalettePolygonPoints);
-    }//for
+    }
 
     for (i = 0; i < BrushAndPenSize; i++) {  //Stifte und Pinsel löschen
         DeleteObject(hPen[i]);
@@ -178,59 +185,66 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
     HDC hdc;
     HPEN hSpPen;
     int i = 0;
-    POINT2D posAlt = {0.0 , 0.0};
+    POINT2D posAlt = {-300 , 300};
 
-    const POINT P0 = { -300, 125 };
-    const POINT P1 = { 0, 125 };
-    //const POINT P2 = {0, 300};
-    const POINT P3 = { -200, 300 };
-    const POINT P4 = { 0, 250 };
-    //const POINT P5 = { 0,100 };
-    const POINT P6 = { -300, 50 };
+	const POINT mitte1 = {0 , 425};
+	const POINT mitte2 = {0 , 375};
 
-    const POINT Pm1 = { 0, 212 };
-    const POINT Pm2 = { 0, 175 };
+    const POINT P0 = { -300, 250 };
+    const POINT P1 = { 0 , 250 };
+
+    //const POINT P2 = { 0 , 600 };
+    const POINT P3 = { -275, 600 };
+
+    const POINT P4 = { 0, 525 };
+    const POINT P5 = { 0, 225 };
 
     /* Objekte initialisieren */
     for (i = 0; i < NOBJ; i++) {
-        Obj[i].P.x = -300;
-        Obj[i].P.y = -300;
+        Obj[i].P.x = -290;
+        Obj[i].P.y = -25;
         Obj[i].status = WARTEN;  /* Status warten */
-    }
+	    }
+
+
     hdc = GetDC(hwnd);
     hSpPen = CreatePen(PS_DOT, 1, RGB(200, 0, 0));
 
-    Obj[0].status = LAUFEN;  //Erstes Obj losschicken
+	Obj[0].status = LAUFEN;
 
     // ueber alle Objekte iterieren bis fertig oder Terminierung angefragt
     for (i = 0; i < NOBJ && (mThreadState != ProcSeqThreadTerminationRequested); i++) {
-        if (NOBJ > i + 1) {
-            Obj[i + 1].status = LAUFEN;
-        }
+
         //nächstes Objekt losschicken
-        PPick.y = Obj[i].P.y;  // PickPosition in Y fixieren
+        if ((Obj[i].P.y <= 0) && (i + 1 < NOBJ)) {
+            Obj[i+1].status = LAUFEN;
+        }
+
+        //PPick.y = Obj[i].P.y;  // PickPosition in Y fixieren
+
         pos = MoveScaraLin(hdc, Pdouble(PPick), pos, VelocityScara, hSpPen, TRUE);	//PickPos anfahren
         pos = MoveScaraLin(hdc, Pdouble(Obj[i].P), pos, VelocityScara, hSpPen, TRUE);	//greifen
 
-        //PlaySound("click.wav", NULL, SND_ASYNC);
+
         posAlt = pos;
         Obj[i].status = BEWEGEN;  //Status
 
         pos = MoveScaraLin(hdc, Pdouble(P0), pos, VelocityScara, hSpPen, TRUE);
         pos = MoveScaraLin(hdc, Pdouble(P1), pos, VelocityScara, hSpPen, TRUE);
-        pos = MoveScaraArc(hdc, Pdouble(Pm1), 87.5, -90, 90, VelocityScara, hSpPen, TRUE);
+        pos = MoveScaraArc(hdc, Pdouble(mitte1), 175, -90, 90, VelocityScara, hSpPen, TRUE);
         pos = MoveScaraLin(hdc, Pdouble(P3), pos, VelocityScara, hSpPen, TRUE);
 
-        pos = MoveScaraLin(hdc, Pdouble(PKiste), pos, (VelocityScara + 700), hSpPen, TRUE);
+	    pos = MoveScaraLin(hdc, Pdouble(PKiste), pos, VelocityScara, hSpPen, TRUE);
 
         Obj[i].status = KISTE; //Status
-        Obj[i].P.x = -200;
-        Obj[i].P.y = 250;
+        Obj[i].P.x = -275;
+        Obj[i].P.y = 525;
         Obj[i].status = FLIESSBAND;
 
         pos = MoveScaraLin(hdc, Pdouble(P4), pos, VelocityScara, hSpPen, TRUE);
-        pos = MoveScaraArc(hdc, Pdouble(Pm2), 75, 90, -90, VelocityScara, hSpPen, TRUE);
-        pos = MoveScaraLin(hdc, Pdouble(P6), pos, VelocityScara, hSpPen, TRUE);
+        pos = MoveScaraArc(hdc, Pdouble(mitte2), 150, 90, -90, VelocityScara, hSpPen, TRUE);
+        pos = MoveScaraLin(hdc, Pdouble(P5), pos, VelocityScara, hSpPen, TRUE);
+
     }
     posAlt = pos;
     ReleaseDC(hwnd, hdc);
@@ -257,13 +271,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     HPEN hSpPen;
     POINT2D P;
     P.x = 0;
-    P.y = 0;
+    P.y = -180;
 
     switch (message)  //Nachrichtenschleife
     {
     case WM_SIZE:  //Bildschirmgröße
         cx = LOWORD(lParam);
-        cy = HIWORD(lParam);
+        cy = HIWORD(lParam)+550;			//mit dem +550 wird das ganze Koordinatensystem um 550 in + y Richtung erweitert
         hdc = GetDC(hwnd);
         if (hBitmap)DeleteObject(hBitmap);	//Bitmap Löschen falls schon vorhanden
         hBitmap = CreateCompatibleBitmap(hdc, cx, cy);	//Neues Bitmap
