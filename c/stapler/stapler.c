@@ -12,11 +12,11 @@
 
 
 typedef enum enumObjectStatus {
-    WARTEN = 1,  /* #define WARTEN 1 */
-    LAUFEN = 2,  /* #define LAUFEN 2 */
-    BEWEGEN = 3,  /* #define BEWEGEN 3 */
-    KISTE = 4,  /* #define KISTE 4 */
-    FLIESSBAND = 5,  /* #define FLIESSBAND 5 */
+    WARTEN = 1,      // #define WARTEN 1
+    LAUFEN = 2, 	 // #define LAUFEN 2
+    BEWEGEN = 3,     // #define BEWEGEN 3
+    KISTE = 4,  	 // #define KISTE 4
+    FLIESSBAND = 5,  // #define FLIESSBAND 5
 } ObjectStatus;
 
 typedef enum enumProcSeqThreadState {
@@ -25,9 +25,9 @@ typedef enum enumProcSeqThreadState {
     ProcSeqThreadTerminated
 } ProcSeqThreadState;
 
-enum {
-    PalettePolygonPoints = 8,
-};
+
+#define PalettePolygonPoints 8
+
 
 typedef struct tagPalletPolygonPoints {
     POINT points[PalettePolygonPoints];
@@ -45,7 +45,7 @@ HDC hdcMem;  // Speicher DC
 static HBITMAP hBitmap;  // Bitmap
 /* Thread variables */
 static HANDLE ThreadHandle = NULL;
-static int VelocityScara = 400;
+static int VelocityScara = 800;				//Startgescw. Animation
 static ProcSeqThreadState mThreadState;
 
 //Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
@@ -60,10 +60,9 @@ POINT spur[1000];			//Spur der Bewegung
 double R1, R2;					//Radien der Arme
 
 /* Anonymes enum für Array size */
-enum {
-     /* Anzahl der Objekte. */
-     NOBJ = 20, /* #define NOBJ 5 */
-};
+
+#define NOBJ 20		/* Anzahl der Objekte. */
+
 
 const int NROLLEN = 4;
 const int DR = 70;
@@ -71,6 +70,7 @@ const int DR = 70;
 static OBJEKT Obj[NOBJ];
 POINT PKiste = { -275,525 };
 POINT PPick = { -300,200 };
+
 
 
 static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY, LONG r) {
@@ -94,7 +94,6 @@ static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY,
     pp.points[7].y = centerY + r - 175;
     return pp;
 }
-
 
 
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
@@ -139,15 +138,19 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
     {
         switch (Obj[i].status)  // Position der Objekte anhand des Status ermitteln
         {
+
             case WARTEN:
                 P = Obj[i].P;
                 break;
             case LAUFEN:   // Weiter auf Laufband bewegen
                 Obj[i].P.y += 1;
                 P = Obj[i].P;
-                if ((Obj[i].P.y >= 50) && (i + 1 < NOBJ)) {
-                    Obj[i + 1].status = LAUFEN;
+                if ((Obj[i].P.y >= 50) && (i + 1 < NOBJ)) {		//Wenn y position = 50 dann direkt nächste palette losschicken
+                    Obj[i + 1].status = LAUFEN;					//sonst ist der abstand zwischen den Paletten zu groß
                 }
+				if (Obj[i].P.y ==200) {
+                    Obj[i].status = WARTEN;
+				}
                 break;
             case BEWEGEN:  // am Greifer
                 P = Pint(PObj);
@@ -155,9 +158,11 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
             case KISTE: //in Kiste
                 P = PKiste;
             case FLIESSBAND:
-                Obj[i].P.x -= 5;
+                Obj[i].P.x -= 2;
                 P = Obj[i].P;
                 break;
+
+
             default:
                 continue;  /* P not initialized. weiter mit next iteration. */
                 break;
@@ -193,7 +198,7 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
     const POINT P0 = { -300, 250 };
     const POINT P1 = { 0 , 250 };
 
-    //const POINT P2 = { 0 , 600 };
+    const POINT P2 = { 0 , 600 };
     const POINT P3 = { -275, 600 };
 
     const POINT P4 = { 0, 525 };
@@ -215,12 +220,10 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
     // ueber alle Objekte iterieren bis fertig oder Terminierung angefragt
     for (i = 0; i < NOBJ && (mThreadState != ProcSeqThreadTerminationRequested); i++) {
 
-        //nächstes Objekt losschicken
         if ((Obj[i].P.y <= 0) && (i + 1 < NOBJ)) {
             Obj[i+1].status = LAUFEN;
-        }
+    }
 
-        //PPick.y = Obj[i].P.y;  // PickPosition in Y fixieren
 
         pos = MoveScaraLin(hdc, Pdouble(PPick), pos, VelocityScara, hSpPen, TRUE);	//PickPos anfahren
         pos = MoveScaraLin(hdc, Pdouble(Obj[i].P), pos, VelocityScara, hSpPen, TRUE);	//greifen
