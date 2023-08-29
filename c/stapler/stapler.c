@@ -47,6 +47,7 @@ static HBITMAP hBitmap;  // Bitmap
 static HANDLE ThreadHandle = NULL;
 static int VelocityScara = 800;				//Startgescw. Animation
 static ProcSeqThreadState mThreadState;
+static int waiting_items = 0;
 
 //Punkte der Roboterarme; Punkt 5 und 6 geben die Gelenkpunkte der Arme (Kreise) an
 // Radius ist in x-Koordinaten des 5ten Punktes versteckt: R1 = 150; R2 = 100
@@ -99,11 +100,9 @@ static PalletPolygonPoints CreatePalletPolygonPoints(LONG centerX, LONG centerY,
 int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband zeichnen
 {
     const long r = 125;  //Größe Objekt und Kisten
-    enum PenAndBrushItems {
-        BrushAndPenSize = 2,
-    };
-    HBRUSH hBrush[BrushAndPenSize] = {NULL, NULL};  //Pinsel
-    HPEN hPen[BrushAndPenSize] = { NULL, NULL };  //Stifte
+    #define PEN_AND_BRUSH_ITEMS 2
+    HBRUSH hBrush[PEN_AND_BRUSH_ITEMS] = {NULL, NULL};  //Pinsel
+    HPEN hPen[PEN_AND_BRUSH_ITEMS] = { NULL, NULL };  //Stifte
     POINT P = {0,0};
     int i = 0;
     // Punkte Scara Ständer
@@ -138,19 +137,30 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
     {
         switch (Obj[i].status)  // Position der Objekte anhand des Status ermitteln
         {
-
             case WARTEN:
                 P = Obj[i].P;
                 break;
-            case LAUFEN:   // Weiter auf Laufband bewegen
-                Obj[i].P.y += 1;
-                P = Obj[i].P;
-                if ((Obj[i].P.y >= 50) && (i + 1 < NOBJ)) {		//Wenn y position = 50 dann direkt nächste palette losschicken
-                    Obj[i + 1].status = LAUFEN;					//sonst ist der abstand zwischen den Paletten zu groß
+            case LAUFEN:
+                // Weiter auf Laufband bewegen, wenn nicht ein Werkstück  wartet
+                if (waiting_items < 1) {
+                    Obj[i].P.y += 1;
+                    P = Obj[i].P;
                 }
-				if (Obj[i].P.y ==200) {
+                //Wenn y position = 50 dann direkt nächste Palette losschicken
+                //sonst ist der abstand zwischen den Paletten zu groß
+                if ((Obj[i].P.y >= 50) && (i + 1 < NOBJ) && (waiting_items < 1)) {
+                    Obj[i + 1].status = LAUFEN;
+                }
+                // wenn eine Palette schon wartet, die anderen anhalten
+                if (Obj[i].P.y >= 200) {
+                    waiting_items += 1;
                     Obj[i].status = WARTEN;
-				}
+                    for (int j = i; j < NOBJ; ++j) {
+                        if (Obj[j].status == LAUFEN) {
+                            Obj[j].status = WARTEN;
+                        }
+                    }
+                }
                 break;
             case BEWEGEN:  // am Greifer
                 P = Pint(PObj);
@@ -161,8 +171,6 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
                 Obj[i].P.x -= 2;
                 P = Obj[i].P;
                 break;
-
-
             default:
                 continue;  /* P not initialized. weiter mit next iteration. */
                 break;
@@ -175,7 +183,7 @@ int DrawItems(HDC hdc, POINT2D PObj, int Flag) //Objekte, Kisten und Laufband ze
         Polygon(hdc, polygon.points, PalettePolygonPoints);
     }
 
-    for (i = 0; i < BrushAndPenSize; i++) {  //Stifte und Pinsel löschen
+    for (i = 0; i < PEN_AND_BRUSH_ITEMS; i++) {  //Stifte und Pinsel löschen
         DeleteObject(hPen[i]);
         DeleteObject(hBrush[i]);
     }
@@ -192,13 +200,13 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
     int i = 0;
     POINT2D posAlt = {-300 , 300};
 
-	const POINT mitte1 = {0 , 425};
-	const POINT mitte2 = {0 , 375};
+    const POINT mitte1 = {0 , 425};
+    const POINT mitte2 = {0 , 375};
 
     const POINT P0 = { -300, 250 };
     const POINT P1 = { 0 , 250 };
 
-    const POINT P2 = { 0 , 600 };
+    //const POINT P2 = { 0 , 600 };
     const POINT P3 = { -275, 600 };
 
     const POINT P4 = { 0, 525 };
@@ -209,21 +217,20 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
         Obj[i].P.x = -290;
         Obj[i].P.y = -25;
         Obj[i].status = WARTEN;  /* Status warten */
-	    }
+    }
 
 
     hdc = GetDC(hwnd);
     hSpPen = CreatePen(PS_DOT, 1, RGB(200, 0, 0));
 
-	Obj[0].status = LAUFEN;
+    Obj[0].status = LAUFEN;
 
     // ueber alle Objekte iterieren bis fertig oder Terminierung angefragt
     for (i = 0; i < NOBJ && (mThreadState != ProcSeqThreadTerminationRequested); i++) {
-
-        if ((Obj[i].P.y <= 0) && (i + 1 < NOBJ)) {
+        // Objekte laufen lassen
+        if ((Obj[i].P.y <= 0) && (i + 1 < NOBJ) && (waiting_items < 1)) {
             Obj[i+1].status = LAUFEN;
-    }
-
+        }
 
         pos = MoveScaraLin(hdc, Pdouble(PPick), pos, VelocityScara, hSpPen, TRUE);	//PickPos anfahren
         pos = MoveScaraLin(hdc, Pdouble(Obj[i].P), pos, VelocityScara, hSpPen, TRUE);	//greifen
@@ -231,6 +238,9 @@ DWORD WINAPI ProcSeq(LPVOID lphwnd)
 
         posAlt = pos;
         Obj[i].status = BEWEGEN;  //Status
+        if (waiting_items > 0) {
+            waiting_items -= 1;
+        }
 
         pos = MoveScaraLin(hdc, Pdouble(P0), pos, VelocityScara, hSpPen, TRUE);
         pos = MoveScaraLin(hdc, Pdouble(P1), pos, VelocityScara, hSpPen, TRUE);
